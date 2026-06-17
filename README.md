@@ -150,6 +150,24 @@ vsim -do "tb_top_qkd_receiver.do"
 quartus_sh -t run_simulation.tcl
 ```
 
+### Viewing Quantum Bit Stream (Key Output)
+```bash
+cd monitoring/
+
+# Option 1: Generate simulated bitstream from QBER metrics
+python bitstream_simulator.py
+# This generates:
+# - bitstream.bin (raw binary format)
+# - bitstream.hex (hexadecimal format)  
+# - bitstream_formatted.txt (formatted for reading)
+# - bitstream_analysis.png (visualization plots)
+
+# Option 2: Read actual bitstream from FPGA (requires RTL modification)
+# First, modify rtl/top_qkd_receiver.v to output bitstream packets
+# Then run:
+python bitstream_reader.py  # interactive mode for COM port reading
+```
+
 ### Real-Time Monitoring
 ```bash
 cd monitoring/
@@ -178,6 +196,69 @@ Each environment model includes:
 - Scattering model: fixed scattering coefficient and bubble parameters
 - Turbulence parameters: oceanic turbulence correlation length
 
+## Quantum Bit Stream Output
+
+The project can output quantum bit sequences in two ways:
+
+### 1. Simulated Bitstream (Python-based)
+Uses the `bitstream_simulator.py` script to generate synthetic bit sequences based on measured QBER:
+
+**Features:**
+- Generates realistic bit patterns matching measured quantum channel characteristics
+- Output formats: Binary, Hexadecimal, Formatted text
+- Statistical analysis of bit distribution and run-length encoding
+- Visualization plots showing bit patterns, error positions, and distributions
+
+**Usage:**
+```bash
+cd monitoring/
+python bitstream_simulator.py
+```
+
+**Output files:**
+- `bitstream.bin` - Raw binary format (1s and 0s)
+- `bitstream.hex` - Hexadecimal representation
+- `bitstream_formatted.txt` - Formatted with byte grouping
+- `bitstream_analysis.png` - Visualization plots
+
+### 2. Actual Bitstream from FPGA (Hardware-based)
+To output real quantum bit sequences from the FPGA receiver:
+
+**RTL Modification Required:**
+Modify `rtl/top_qkd_receiver.v` to add a bitstream buffer:
+
+```verilog
+// Add to top_qkd_receiver.v
+reg [1023:0] sifted_bits;  // Store 1024 sifted bits
+reg [1023:0] error_mask;   // Error positions (1=error, 0=ok)
+
+// Capture bits when basis matches and photon received
+always @(posedge clk_50mhz) begin
+    if (basis_match && photon_received) begin
+        sifted_bits[bit_count] <= received_bit;
+        error_mask[bit_count]  <= bit_error;
+    end
+end
+
+// Transmit bitstream packet format: 0xBB + 128 bytes + checksum + 0x55
+```
+
+**UART Protocol for Bitstream Packet:**
+- Byte 0: 0xBB (start marker)
+- Bytes 1-128: 1024 bits as 128 bytes
+- Byte 129: XOR checksum
+- Byte 130: 0x55 (end marker)
+
+**Read bitstream in Python:**
+```python
+from monitoring.bitstream_reader import read_bitstream_packet
+import serial
+
+ser = serial.Serial('COM16', 115200)
+bitstream = read_bitstream_packet(ser)
+print(f"Received {len(bitstream)} bits: {bitstream[:64]}...")
+```
+
 ## Data Analysis
 
 The project tracks:
@@ -186,6 +267,7 @@ The project tracks:
 - Path loss and attenuation
 - Scattering effects
 - Turbulence impact
+- **Quantum Bit Sequences** (with extended RTL)
 
 ## Contributing
 
