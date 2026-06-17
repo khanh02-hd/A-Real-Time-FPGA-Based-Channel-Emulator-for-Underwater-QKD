@@ -1,0 +1,128 @@
+`timescale 1ns / 1ps
+
+module tb_top_qkd_receiver();
+
+    // ============================================================
+    // 1. KHAI BÁO TÍN HIỆU
+    // ============================================================
+    reg clk_50mhz;
+    reg rst_n;
+    reg [1:0] SW;
+
+    wire alert_led;
+    wire uart_txd;
+
+    // Rút ngắn thời gian mô phỏng (1ms thay vì 1s)
+    localparam SIM_WINDOW_TICKS = 50_000;
+
+    // ============================================================
+    // 2. KHỞI TẠO MODULE (DUT)
+    // ============================================================
+    top_qkd_receiver #(
+        .WINDOW_TICKS(SIM_WINDOW_TICKS)
+    ) uut (
+        .clk_50mhz(clk_50mhz),
+        .rst_n(rst_n),
+        .SW(SW),
+        .alert_led(alert_led),
+        .uart_txd(uart_txd)
+    );
+
+    // ============================================================
+    // 3. TẠO CLOCK & KỊCH BẢN KÍCH THÍCH (STIMULUS)
+    // ============================================================
+    initial begin
+        clk_50mhz = 1'b0;
+        forever #10 clk_50mhz = ~clk_50mhz;
+    end
+
+    initial begin
+        SW    = 2'b00;
+        rst_n = 1'b0;
+
+        #100;
+        rst_n = 1'b1;
+        $display("[%0t] HET RESET, BAT DAU MO PHONG", $time);
+
+        // Mốc 1m
+        SW = 2'b00;
+        $display("\n[%0t] TEST 1m, SW=00", $time);
+        #(SIM_WINDOW_TICKS * 20 * 3);
+
+        // Mốc 5m
+        SW = 2'b01;
+        $display("\n[%0t] TEST 5m, SW=01", $time);
+        #(SIM_WINDOW_TICKS * 20 * 3);
+
+        // Mốc 7m
+        SW = 2'b10;
+        $display("\n[%0t] TEST 7m, SW=10", $time);
+        #(SIM_WINDOW_TICKS * 20 * 3);
+
+        // Mốc 10m
+        SW = 2'b11;
+        $display("\n[%0t] TEST 10m, SW=11", $time);
+        #(SIM_WINDOW_TICKS * 20 * 3);
+
+        $display("\n[%0t] HOAN THANH MO PHONG", $time);
+        $stop;
+    end
+
+    // ============================================================
+    // 4. SCALE QUY ĐỔI VỀ 1 GIÂY & IN KẾT QUẢ RA CONSOLE
+    // ============================================================
+    localparam [63:0] SCALE_TO_1SEC = 64'd50_000_000 / SIM_WINDOW_TICKS;
+
+    reg [63:0] sim_sifted_1sec;
+    reg [63:0] sim_error_1sec;
+    reg [63:0] sim_skr_1sec;
+
+    real qber_pc_pct;
+    real qber_fpga_pct;
+
+    always @(posedge uut.uart_send_pulse) begin
+        #1;
+
+        // Dùng dữ liệu latched để khớp đúng packet UART
+        sim_sifted_1sec = {32'd0, uut.n_sifted_latched} * SCALE_TO_1SEC;
+        sim_error_1sec  = {32'd0, uut.n_error_latched}  * SCALE_TO_1SEC;
+        sim_skr_1sec    = {32'd0, uut.final_skr_latched} * SCALE_TO_1SEC;
+
+        if (uut.n_sifted_latched != 0)
+            qber_pc_pct = (100.0 * uut.n_error_latched) / uut.n_sifted_latched;
+        else
+            qber_pc_pct = 0.0;
+
+        qber_fpga_pct = (100.0 * uut.qber_latched) / 1024.0;
+
+        $display("------------------------------------------------------------");
+        $display("[%0t] FPGA RESULT - SCALED TO 1 SECOND", $time);
+        $display("SW              = %b", uut.sw_latched);
+        $display("L_s_const       = %0d", uut.L_s_const);
+
+        $display("n_sifted        = %0d  (raw window = %0d)",
+                 sim_sifted_1sec, uut.n_sifted_latched);
+
+        $display("n_error         = %0d  (raw window = %0d)",
+                 sim_error_1sec, uut.n_error_latched);
+
+        $display("QBER_FPGA       = %0.2f %%  (qber_idx = %0d / 1024)",
+                 qber_fpga_pct, uut.qber_latched);
+
+        $display("QBER_PC         = %0.2f %%", qber_pc_pct);
+
+        $display("final_skr       = %0d bps  (raw window = %0d)",
+                 sim_skr_1sec, uut.final_skr_latched);
+
+        if (sim_sifted_1sec < 64'd1000)
+            $display("STATUS          = OUTAGE");
+        else if ((uut.qber_latched > 10'd112) || (sim_skr_1sec == 64'd0))
+            $display("STATUS          = ALERT");
+        else
+            $display("STATUS          = SAFE");
+
+        $display("alert_led raw   = %b  // LED trong DUT van dung raw window", alert_led);
+        $display("------------------------------------------------------------");
+    end
+
+endmodule

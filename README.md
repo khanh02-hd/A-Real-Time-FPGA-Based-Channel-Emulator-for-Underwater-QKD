@@ -33,6 +33,21 @@ The project evaluates QKD performance across three distinct underwater scenarios
 ├── plots/                     # Plotting and analysis utilities
 │   └── plot_loss.py                 # Loss analysis and visualization
 │
+├── rtl/                       # FPGA RTL (Verilog) and design files
+│   ├── top_qkd_receiver.v           # Top-level receiver module
+│   ├── uwoc_channel_st.v            # Underwater optical channel model
+│   ├── uwoc_qkd_soc.v               # QKD System-on-Chip
+│   ├── uart_tx.v                    # UART transmitter
+│   ├── qkd_metrics_counter.v        # QKD performance counter
+│   ├── skr_evaluator.v              # Secret key rate evaluator
+│   ├── trng_qkd3_source.v           # TRNG source
+│   ├── rom_ho.v, rom_hs.v           # ROM instances for lookup tables
+│   ├── prng_lfsr_32bit.v            # PRNG/LFSR for key generation
+│   ├── *.qpf, *.qsf                 # Quartus project files
+│   ├── *.sdc                        # Timing constraints
+│   ├── *.mif                        # Memory initialization files
+│   └── tb_*.v                       # Testbenches
+│
 ├── deprecated/                # Deprecated or development files (not tracked)
 │   ├── realtime.py
 │   └── ve.py
@@ -59,6 +74,20 @@ The project evaluates QKD performance across three distinct underwater scenarios
 - Real-time data visualization and monitoring
 - Configurable baud rate: 115200 bps
 - Auto-sweep capability over multiple distance points
+
+### FPGA RTL Design
+- **HDL Implementation**: Verilog modules for QKD receiver and channel emulation
+- **Key Modules**:
+  - `top_qkd_receiver`: Main QKD receiver architecture
+  - `uwoc_channel_st`: Underwater optical wireless channel simulator
+  - `uwoc_qkd_soc`: Complete System-on-Chip with integrated components
+  - `qkd_metrics_counter`: Real-time QBER and key rate calculation
+  - `skr_evaluator`: Secret Key Rate computation engine
+  - `trng_qkd3_source`: True Random Number Generator
+  - `uart_tx`: Serial communication interface
+- **Lookup Table ROM**: Pre-loaded channel characteristic tables
+- **Testbenches**: Complete simulation testbenches for validation
+- **Design Tools**: Altera Quartus II project files for DE2-115 FPGA
 
 ## Hardware Requirements
 
@@ -96,6 +125,29 @@ cd lut/
 python lut_env1_clear_ocean.py    # Clear water LUT
 python lut_env2_coastal.py         # Coastal water LUT
 python lut_env3_harbor_bubbles.py  # Turbid harbor LUT
+```
+
+### FPGA RTL Compilation and Synthesis
+```bash
+cd rtl/
+# Open with Altera Quartus II
+quartus uwoc_qkd_receiver.qpf
+
+# Build flow:
+# 1. Analysis & Synthesis
+# 2. Place & Route
+# 3. Generate `.sof` file for programming
+# 4. Program DE2-115 board
+```
+
+### RTL Simulation
+```bash
+# Run ModelSim/Quartus simulation
+cd rtl/
+vsim -do "tb_top_qkd_receiver.do"
+
+# Or use Quartus integrated simulator
+quartus_sh -t run_simulation.tcl
 ```
 
 ### Real-Time Monitoring
