@@ -1,0 +1,70 @@
+`timescale 1ns / 1ps
+
+// =============================================================
+// One TRNG entropy lane based on multiple ring oscillators.
+//
+// IMPORTANT FOR QUARTUS:
+// - Ring oscillators are intentional combinational loops.
+// - Quartus may show warnings about combinational loops. This is expected.
+// - Add this file to the project only for FPGA hardware synthesis.
+// - For ModelSim, use TRNG_SIM_MODE=1 in trng_qkd3_source.
+// =============================================================
+module trng_ro_lane #(
+    parameter RO_BANKS  = 4,
+    parameter RO_STAGES = 5
+)(
+    input  wire clk,
+    input  wire rst_n,
+
+    output wire bit_valid,
+    output wire bit_out
+);
+
+    genvar b;
+    genvar s;
+
+    wire [RO_BANKS-1:0] ro_tap;
+
+    generate
+        for (b = 0; b < RO_BANKS; b = b + 1) begin : GEN_RO_BANK
+            // Odd number of inverters/delay elements forms an oscillator.
+            (* keep = "true", preserve = "true" *) wire [RO_STAGES-1:0] ro;
+
+            assign ro[0] = ~ro[RO_STAGES-1];
+
+            for (s = 1; s < RO_STAGES; s = s + 1) begin : GEN_RO_STAGE
+                assign ro[s] = ~ro[s-1];
+            end
+
+            assign ro_tap[b] = ro[RO_STAGES-1];
+        end
+    endgenerate
+
+    // Sample asynchronous RO states by FPGA clock.
+    // XOR many oscillator taps to reduce deterministic bias of one RO.
+    reg [RO_BANKS-1:0] ro_sample_1;
+    reg [RO_BANKS-1:0] ro_sample_2;
+    reg raw_bit_r;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            ro_sample_1 <= {RO_BANKS{1'b0}};
+            ro_sample_2 <= {RO_BANKS{1'b0}};
+            raw_bit_r   <= 1'b0;
+        end else begin
+            ro_sample_1 <= ro_tap;
+            ro_sample_2 <= ro_sample_1;
+            raw_bit_r   <= ^ro_sample_2;
+        end
+    end
+
+    trng_vn_extractor u_vn (
+        .clk(clk),
+        .rst_n(rst_n),
+        .raw_valid(1'b1),
+        .raw_bit(raw_bit_r),
+        .out_valid(bit_valid),
+        .out_bit(bit_out)
+    );
+
+endmodule

@@ -1,0 +1,97 @@
+`timescale 1ns / 1ps
+
+module uwoc_channel_st #(
+    parameter integer UPDATE_DIV = 5000,  // 50 MHz / 5000 = 10 kHz
+    parameter integer K_HO       = 6,     // tốc độ cập nhật turbulence
+    parameter integer K_HS       = 7      // tốc độ cập nhật scattering/bubbles
+)(
+    input  wire        clk,
+    input  wire        rst_n,
+
+    input  wire [15:0] data_ho,     // UQ4.12 sample from rom_ho
+    input  wire [15:0] data_hs,     // UQ4.12 sample from rom_hs
+    input  wire [31:0] L_s_const,   // Q0.32 path loss
+
+    output wire [31:0] prob_click,  // Q0.32 probability
+    output reg  [15:0] ho_state_dbg,
+    output reg  [15:0] hs_state_dbg,
+    output reg         channel_tick_dbg
+);
+
+    // -------------------------------------------------------------
+    // 1. Tick cập nhật kênh theo thời gian t
+    // -------------------------------------------------------------
+    reg [31:0] update_cnt;
+
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            update_cnt       <= 32'd0;
+            channel_tick_dbg <= 1'b0;
+        end else begin
+            if (update_cnt == UPDATE_DIV - 1) begin
+                update_cnt       <= 32'd0;
+                channel_tick_dbg <= 1'b1;
+            end else begin
+                update_cnt       <= update_cnt + 1'b1;
+                channel_tick_dbg <= 1'b0;
+            end
+        end
+    end
+
+    // -------------------------------------------------------------
+    // 2. Bộ lọc IIR/AR(1)
+    //
+    // h_o(t+1) = h_o(t) + [sample - h_o(t)] / 2^K_HO
+    // h_s(t+1) = h_s(t) + [sample - h_s(t)] / 2^K_HS
+    //
+    // UQ4.12: 1.0 = 4096
+    // -------------------------------------------------------------
+    always @(posedge clk or negedge rst_n) begin
+        if (!rst_n) begin
+            ho_state_dbg <= 16'd4096; // 1.0
+            hs_state_dbg <= 16'd4096; // 1.0
+        end else if (channel_tick_dbg) begin
+            // Update h_o
+            if (data_ho >= ho_state_dbg)
+                ho_state_dbg <= ho_state_dbg + ((data_ho - ho_state_dbg) >> K_HO);
+            else
+                ho_state_dbg <= ho_state_dbg - ((ho_state_dbg - data_ho) >> K_HO);
+
+            // Update h_s
+            if (data_hs >= hs_state_dbg)
+                hs_state_dbg <= hs_state_dbg + ((data_hs - hs_state_dbg) >> K_HS);
+            else
+                hs_state_dbg <= hs_state_dbg - ((hs_state_dbg - data_hs) >> K_HS);
+        end
+    end
+
+    // -------------------------------------------------------------
+    // 3. h_total(s,t) = h_o(s,t) * h_s(s,t)
+    //
+    // UQ4.12 * UQ4.12 = UQ8.24
+    // Dịch phải 12 bit để quay về dạng có 12 fractional bits.
+    // -------------------------------------------------------------
+    wire [31:0] h_mult_full;
+    wire [31:0] h_total;
+
+    assign h_mult_full = ho_state_dbg * hs_state_dbg;
+    assign h_total     = h_mult_full >> 12;
+
+    // -------------------------------------------------------------
+    // 4. prob_click(s,t) = L(s) * h_o(s,t) * h_s(s,t)
+    //
+    // h_total   : fixed-point có 12 fractional bits
+    // L_s_const : Q0.32
+    // Output    : Q0.32
+    // -------------------------------------------------------------
+    wire [63:0] prob_full;
+    wire [63:0] prob_shifted;
+
+    assign prob_full    = h_total * L_s_const;
+    assign prob_shifted = prob_full >> 12;
+
+    assign prob_click = (prob_shifted > 64'h0000_0000_FFFF_FFFF) ?
+                        32'hFFFF_FFFF :
+                        prob_shifted[31:0];
+
+endmodule
