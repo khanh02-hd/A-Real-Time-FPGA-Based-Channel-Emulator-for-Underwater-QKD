@@ -19,6 +19,14 @@ timing/
 __pycache__/
 *.pyc
 
+# Generated key files (not to be committed - these are runtime outputs)
+fpga_quantum_keys*.bin
+fpga_quantum_keys*.hex
+fpga_quantum_keys*_formatted.txt
+fpga_quantum_keys*_metadata.txt
+real_qkd_keys*.bin
+real_qkd_keys*.hex
+
 # Bitstream output files (generated, not source)
 bitstream.bin
 bitstream.hex

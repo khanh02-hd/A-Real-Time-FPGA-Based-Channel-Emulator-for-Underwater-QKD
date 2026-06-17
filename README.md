@@ -154,7 +154,13 @@ quartus_sh -t run_simulation.tcl
 ```bash
 cd monitoring/
 
-# Option 1: Generate simulated bitstream from QBER metrics
+# Option 1: Read ACTUAL quantum keys from FPGA ⭐⭐⭐ (RECOMMENDED)
+python fpga_key_reader.py
+# Interactive mode - connect to FPGA and extract real sifted keys
+# Generates: fpga_quantum_keys.bin, fpga_quantum_keys.hex, fpga_quantum_keys_metadata.txt
+# See FPGA_KEYS_GUIDE.md for integration instructions
+
+# Option 2: Generate simulated bitstream from QBER metrics
 python bitstream_simulator.py
 # This generates:
 # - bitstream.bin (raw binary format)
@@ -162,17 +168,11 @@ python bitstream_simulator.py
 # - bitstream_formatted.txt (formatted for reading)
 # - bitstream_analysis.png (visualization plots)
 
-# Option 2: Read REAL bitstream from FPGA hardware ⭐
-# (Requires RTL modification - see REAL_BITSTREAM_GUIDE.md)
-python real_bitstream_reader.py
-# Interactive mode to read actual quantum bits captured by FPGA receiver
-# Generates: real_qkd_bitstream.bin, real_qkd_metadata.txt, etc.
-
-# Option 3: Read simulated bitstream with reader
-python bitstream_reader.py
+# Option 3: Read bitstream from FPGA (requires RTL modification)
+python bitstream_reader.py  # Alternative reader
 ```
 
-**For real bitstream extraction:** See [REAL_BITSTREAM_GUIDE.md](REAL_BITSTREAM_GUIDE.md) for detailed implementation instructions.
+**For real FPGA keys:** See [FPGA_KEYS_GUIDE.md](FPGA_KEYS_GUIDE.md) for detailed setup.
 
 ### Real-Time Monitoring
 ```bash
@@ -204,13 +204,37 @@ Each environment model includes:
 
 ## Quantum Bit Stream Output
 
-The project can output quantum bit sequences in two ways:
+The project can output quantum bit sequences in three ways:
 
-### 1. Simulated Bitstream (Python-based)
-Uses the `bitstream_simulator.py` script to generate synthetic bit sequences based on measured QBER:
+### 1. Actual Sifted Keys from FPGA (Real Quantum Keys) ⭐
+Uses the new `qkd_sifted_key_extractor.v` RTL module to generate and transmit **real sifted keys**:
 
 **Features:**
-- Generates realistic bit patterns matching measured quantum channel characteristics
+- FPGA generates actual sifted bits (basis matched photons)
+- Real-time key extraction during each 1-second window
+- Transmitted via extended UART protocol (marker 0xDD)
+- Interactive Python reader to capture and export keys
+- Statistical analysis and randomness validation
+
+**Usage:**
+```bash
+cd monitoring/
+python fpga_key_reader.py
+```
+
+**Implementation:** See [FPGA_KEYS_GUIDE.md](FPGA_KEYS_GUIDE.md) for RTL integration
+
+**Output files:**
+- `fpga_quantum_keys.bin` - Raw sifted bits (actual keys!)
+- `fpga_quantum_keys.hex` - Hexadecimal format
+- `fpga_quantum_keys_formatted.txt` - Formatted with timestamps
+- `fpga_quantum_keys_metadata.txt` - Metadata (bit count, QBER, etc)
+
+### 2. Simulated Bitstream (Python-based)
+Uses the `bitstream_simulator.py` script to generate synthetic bit sequences based on measured QBER
+
+**Features:**
+- Generates realistic bit patterns matching quantum channel characteristics
 - Output formats: Binary, Hexadecimal, Formatted text
 - Statistical analysis of bit distribution and run-length encoding
 - Visualization plots showing bit patterns, error positions, and distributions
@@ -221,48 +245,40 @@ cd monitoring/
 python bitstream_simulator.py
 ```
 
-**Output files:**
-- `bitstream.bin` - Raw binary format (1s and 0s)
-- `bitstream.hex` - Hexadecimal representation
-- `bitstream_formatted.txt` - Formatted with byte grouping
-- `bitstream_analysis.png` - Visualization plots
+### 3. Actual Bitstream from FPGA (Alternative)
+The `bitstream_reader.py` and `real_bitstream_reader.py` provide alternative ways to capture raw bitstream
 
-### 2. Actual Bitstream from FPGA (Hardware-based)
-To output real quantum bit sequences from the FPGA receiver:
+---
 
-**RTL Modification Required:**
-Modify `rtl/top_qkd_receiver.v` to add a bitstream buffer:
+## Key Generation Architecture
 
-```verilog
-// Add to top_qkd_receiver.v
-reg [1023:0] sifted_bits;  // Store 1024 sifted bits
-reg [1023:0] error_mask;   // Error positions (1=error, 0=ok)
-
-// Capture bits when basis matches and photon received
-always @(posedge clk_50mhz) begin
-    if (basis_match && photon_received) begin
-        sifted_bits[bit_count] <= received_bit;
-        error_mask[bit_count]  <= bit_error;
-    end
-end
-
-// Transmit bitstream packet format: 0xBB + 128 bytes + checksum + 0x55
 ```
-
-**UART Protocol for Bitstream Packet:**
-- Byte 0: 0xBB (start marker)
-- Bytes 1-128: 1024 bits as 128 bytes
-- Byte 129: XOR checksum
-- Byte 130: 0x55 (end marker)
-
-**Read bitstream in Python:**
-```python
-from monitoring.bitstream_reader import read_bitstream_packet
-import serial
-
-ser = serial.Serial('COM16', 115200)
-bitstream = read_bitstream_packet(ser)
-print(f"Received {len(bitstream)} bits: {bitstream[:64]}...")
+FPGA Quantum Receiver
+│
+├─ Photon Detection (APD)
+├─ Basis Selection (Random basis)
+├─ Basis Matching Check
+│
+└─ Sifted Bits → qkd_sifted_key_extractor.v
+                  │
+                  ├─ Buffer capture (1024 bits max)
+                  ├─ Count sifted bits
+                  └─ UART transmission (0xDD packet)
+                     │
+                     ↓
+                  UART @ 115200 bps
+                     │
+                     ↓ (PC via serial port)
+                     │
+         fpga_key_reader.py (Python)
+                     │
+                     ├─ Verify checksum
+                     ├─ Extract bits
+                     ├─ Analyze randomness
+                     └─ Export to files
+                        │
+                        ✓ fpga_quantum_keys.bin (SIFTED KEYS)
+                        ✓ Statistical analysis
 ```
 
 ## Data Analysis
