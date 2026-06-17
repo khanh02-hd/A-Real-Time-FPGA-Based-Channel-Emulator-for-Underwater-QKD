@@ -19,5 +19,5 @@ timing/
 __pycache__/
 *.pyc
 
-realtime.py
-ve.py
+# Deprecated/Development files
+deprecated/
