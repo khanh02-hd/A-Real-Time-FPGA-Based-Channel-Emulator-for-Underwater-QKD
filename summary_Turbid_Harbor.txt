@@ -1,0 +1,70 @@
+ENVIRONMENT: Turbid_Harbor
+mu_alice = 1.0
+eta_bob = 0.5
+lambda = 5.3e-07
+Equivalent P_tx = 1.874006e-11 W = -77.27 dBm
+c_fixed = 2.195
+Weibull beta = 1.5
+sigma_s2 = 0.05
+
+d=1.0m | L_eff=1.604e-02 | sigma_I2=1.073e-04 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=1.1m | L_eff=1.065e-02 | sigma_I2=1.428e-04 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=1.2m | L_eff=7.183e-03 | sigma_I2=1.854e-04 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=1.3m | L_eff=4.914e-03 | sigma_I2=2.357e-04 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=1.4m | L_eff=3.402e-03 | sigma_I2=2.944e-04 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=1.5m | L_eff=2.379e-03 | sigma_I2=3.621e-04 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=1.6m | L_eff=1.679e-03 | sigma_I2=4.395e-04 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=1.7m | L_eff=1.194e-03 | sigma_I2=5.271e-04 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=1.8m | L_eff=8.553e-04 | sigma_I2=6.257e-04 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=1.9m | L_eff=6.164e-04 | sigma_I2=7.358e-04 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=2.0m | L_eff=4.466e-04 | sigma_I2=8.582e-04 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=2.1m | L_eff=3.253e-04 | sigma_I2=9.935e-04 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=2.2m | L_eff=2.380e-04 | sigma_I2=1.142e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=2.3m | L_eff=1.748e-04 | sigma_I2=1.305e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=2.4m | L_eff=1.289e-04 | sigma_I2=1.483e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=2.5m | L_eff=9.539e-05 | sigma_I2=1.676e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=2.6m | L_eff=7.081e-05 | sigma_I2=1.885e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=2.7m | L_eff=5.272e-05 | sigma_I2=2.111e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=2.8m | L_eff=3.936e-05 | sigma_I2=2.354e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=2.9m | L_eff=2.946e-05 | sigma_I2=2.615e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=3.0m | L_eff=2.211e-05 | sigma_I2=2.895e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=3.1m | L_eff=1.662e-05 | sigma_I2=3.194e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=3.2m | L_eff=1.253e-05 | sigma_I2=3.514e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=3.3m | L_eff=9.457e-06 | sigma_I2=3.853e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=3.4m | L_eff=7.153e-06 | sigma_I2=4.214e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=3.5m | L_eff=5.420e-06 | sigma_I2=4.597e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=3.6m | L_eff=4.113e-06 | sigma_I2=5.002e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=3.7m | L_eff=3.126e-06 | sigma_I2=5.430e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=3.8m | L_eff=2.380e-06 | sigma_I2=5.882e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=3.9m | L_eff=1.814e-06 | sigma_I2=6.358e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=4.0m | L_eff=1.385e-06 | sigma_I2=6.859e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=4.1m | L_eff=1.058e-06 | sigma_I2=7.386e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=4.2m | L_eff=8.097e-07 | sigma_I2=7.939e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=4.3m | L_eff=6.202e-07 | sigma_I2=8.520e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=4.4m | L_eff=4.756e-07 | sigma_I2=9.127e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=4.5m | L_eff=3.651e-07 | sigma_I2=9.763e-03 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=4.6m | L_eff=2.805e-07 | sigma_I2=1.043e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=4.7m | L_eff=2.158e-07 | sigma_I2=1.112e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=4.8m | L_eff=1.661e-07 | sigma_I2=1.185e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=4.9m | L_eff=1.280e-07 | sigma_I2=1.260e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=5.0m | L_eff=9.869e-08 | sigma_I2=1.339e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=5.1m | L_eff=7.616e-08 | sigma_I2=1.421e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=5.2m | L_eff=5.882e-08 | sigma_I2=1.506e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=5.3m | L_eff=4.546e-08 | sigma_I2=1.594e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=5.4m | L_eff=3.516e-08 | sigma_I2=1.686e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=5.5m | L_eff=2.722e-08 | sigma_I2=1.781e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=5.6m | L_eff=2.108e-08 | sigma_I2=1.880e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=5.7m | L_eff=1.634e-08 | sigma_I2=1.982e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=5.8m | L_eff=1.267e-08 | sigma_I2=2.088e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=5.9m | L_eff=9.830e-09 | sigma_I2=2.198e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=6.0m | L_eff=7.632e-09 | sigma_I2=2.311e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=6.1m | L_eff=5.928e-09 | sigma_I2=2.429e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=6.2m | L_eff=4.608e-09 | sigma_I2=2.550e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=6.3m | L_eff=3.583e-09 | sigma_I2=2.675e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=6.4m | L_eff=2.788e-09 | sigma_I2=2.804e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=6.5m | L_eff=2.170e-09 | sigma_I2=2.937e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=6.6m | L_eff=1.690e-09 | sigma_I2=3.075e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=6.7m | L_eff=1.317e-09 | sigma_I2=3.216e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=6.8m | L_eff=1.026e-09 | sigma_I2=3.362e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=6.9m | L_eff=8.003e-10 | sigma_I2=3.512e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+d=7.0m | L_eff=6.244e-10 | sigma_I2=3.667e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223

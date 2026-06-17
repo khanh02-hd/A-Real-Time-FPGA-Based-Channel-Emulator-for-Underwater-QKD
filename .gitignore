@@ -1,0 +1,20 @@
+# Quartus ignores
+db/
+incremental_db/
+output_files/
+simulation/
+timing/
+*.rpt
+*.summary
+*.done
+*.jdi
+*.pin
+*.qws
+
+# Nếu bạn muốn giữ lại file nạp .sof thì xóa dòng dưới đi
+*.sof
+*.pof
+
+# Python ignores
+__pycache__/
+*.pyc
