@@ -162,11 +162,17 @@ python bitstream_simulator.py
 # - bitstream_formatted.txt (formatted for reading)
 # - bitstream_analysis.png (visualization plots)
 
-# Option 2: Read actual bitstream from FPGA (requires RTL modification)
-# First, modify rtl/top_qkd_receiver.v to output bitstream packets
-# Then run:
-python bitstream_reader.py  # interactive mode for COM port reading
+# Option 2: Read REAL bitstream from FPGA hardware ⭐
+# (Requires RTL modification - see REAL_BITSTREAM_GUIDE.md)
+python real_bitstream_reader.py
+# Interactive mode to read actual quantum bits captured by FPGA receiver
+# Generates: real_qkd_bitstream.bin, real_qkd_metadata.txt, etc.
+
+# Option 3: Read simulated bitstream with reader
+python bitstream_reader.py
 ```
+
+**For real bitstream extraction:** See [REAL_BITSTREAM_GUIDE.md](REAL_BITSTREAM_GUIDE.md) for detailed implementation instructions.
 
 ### Real-Time Monitoring
 ```bash
