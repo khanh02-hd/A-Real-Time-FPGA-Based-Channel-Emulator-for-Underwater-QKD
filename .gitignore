@@ -19,5 +19,11 @@ timing/
 __pycache__/
 *.pyc
 
+# Bitstream output files (generated, not source)
+bitstream.bin
+bitstream.hex
+bitstream_formatted.txt
+bitstream_analysis.png
+
 # Deprecated/Development files
 deprecated/
