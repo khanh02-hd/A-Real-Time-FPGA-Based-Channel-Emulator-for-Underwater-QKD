@@ -3,7 +3,7 @@
 module top_qkd_receiver #(
     parameter WINDOW_TICKS  = 50_000_000,
     parameter ENV_MODE      = 2,  // 0: Clear Water | 1: Coastal Water | 2: Turbid Harbor
-    parameter TRNG_SIM_MODE = 1   // 0: FPGA thật | 1: ModelSim simulation
+    parameter TRNG_SIM_MODE = 0   // 0: FPGA thật | 1: ModelSim simulation
 )(
     input  wire clk_50mhz,
     input  wire rst_n,

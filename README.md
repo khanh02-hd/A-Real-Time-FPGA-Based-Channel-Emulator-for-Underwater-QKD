@@ -42,7 +42,6 @@ The project evaluates QKD performance across three distinct underwater scenarios
 │   ├── skr_evaluator.v              # Secret key rate evaluator
 │   ├── trng_qkd3_source.v           # TRNG source
 │   ├── rom_ho.v, rom_hs.v           # ROM instances for lookup tables
-│   ├── prng_lfsr_32bit.v            # PRNG/LFSR for key generation
 │   ├── *.qpf, *.qsf                 # Quartus project files
 │   ├── *.sdc                        # Timing constraints
 │   ├── *.mif                        # Memory initialization files
@@ -79,7 +78,6 @@ The project evaluates QKD performance across three distinct underwater scenarios
 - **HDL Implementation**: Verilog modules for QKD receiver and channel emulation
 - **Key Modules**:
   - `top_qkd_receiver`: Main QKD receiver architecture
-  - `uwoc_channel_st`: Underwater optical wireless channel simulator
   - `uwoc_qkd_soc`: Complete System-on-Chip with integrated components
   - `qkd_metrics_counter`: Real-time QBER and key rate calculation
   - `skr_evaluator`: Secret Key Rate computation engine
@@ -155,7 +153,7 @@ quartus_sh -t run_simulation.tcl
 cd monitoring/
 
 # Option 1: Read ACTUAL quantum keys from FPGA ⭐⭐⭐ (RECOMMENDED)
-python fpga_key_reader.py
+python fpga_key_and_metric_reader.py
 # Interactive mode - connect to FPGA and extract real sifted keys
 # Generates: fpga_quantum_keys.bin, fpga_quantum_keys.hex, fpga_quantum_keys_metadata.txt
 # See FPGA_KEYS_GUIDE.md for integration instructions
@@ -204,7 +202,17 @@ Each environment model includes:
 
 ## Quantum Bit Stream Output
 
-The project can output quantum bit sequences in three ways:
+The FPGA transmits one complete UART frame per measurement window:
+
+0xAA
+14-byte metric payload
+0xBB
+2-byte key payload length
+raw sifted key payload
+0x55
+
+Use:
+python fpga_key_and_metric_reader.py
 
 ### 1. Actual Sifted Keys from FPGA (Real Quantum Keys) ⭐
 Uses the new `qkd_sifted_key_extractor.v` RTL module to generate and transmit **real sifted keys**:
@@ -212,14 +220,14 @@ Uses the new `qkd_sifted_key_extractor.v` RTL module to generate and transmit **
 **Features:**
 - FPGA generates actual sifted bits (basis matched photons)
 - Real-time key extraction during each 1-second window
-- Transmitted via extended UART protocol (marker 0xDD)
+- Transmitted via extended UART protocol (frame 0xAA + 0xBB)
 - Interactive Python reader to capture and export keys
 - Statistical analysis and randomness validation
 
 **Usage:**
 ```bash
 cd monitoring/
-python fpga_key_reader.py
+python fpga_key_and_metric_reader.py
 ```
 
 **Implementation:** See [FPGA_KEYS_GUIDE.md](FPGA_KEYS_GUIDE.md) for RTL integration
@@ -263,14 +271,14 @@ FPGA Quantum Receiver
                   │
                   ├─ Buffer capture (1024 bits max)
                   ├─ Count sifted bits
-                  └─ UART transmission (0xDD packet)
+                  └─ UART transmission (0xAA + 14-byte metric + 0xBB + key payload length + key payload + 0x55)
                      │
                      ↓
                   UART @ 115200 bps
                      │
                      ↓ (PC via serial port)
                      │
-         fpga_key_reader.py (Python)
+         fpga_key_and_metric_reader.py (Python)
                      │
                      ├─ Verify checksum
                      ├─ Extract bits
