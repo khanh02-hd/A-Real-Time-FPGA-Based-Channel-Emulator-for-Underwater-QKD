@@ -28,4 +28,4 @@ module prng_lfsr_32bit #(
         end
     end
 
-endmodule
+endmodule 

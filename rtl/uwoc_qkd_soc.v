@@ -292,4 +292,4 @@ module uwoc_qkd_soc #(
         end
     end
 
-endmodule
+endmodule 

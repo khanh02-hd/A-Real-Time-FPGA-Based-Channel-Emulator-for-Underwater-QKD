@@ -180,4 +180,4 @@ module uwoc_channel_st #(
                         32'hFFFF_FFFF :
                         prob_shifted[31:0];
 
-endmodule
+endmodule 

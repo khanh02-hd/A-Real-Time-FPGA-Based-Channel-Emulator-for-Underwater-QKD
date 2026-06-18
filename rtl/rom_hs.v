@@ -155,3 +155,4 @@ endmodule
 // Retrieval info: GEN_FILE: TYPE_NORMAL rom_hs_inst.v FALSE
 // Retrieval info: GEN_FILE: TYPE_NORMAL rom_hs_bb.v TRUE
 // Retrieval info: LIB_FILE: altera_mf
+ 

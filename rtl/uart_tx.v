@@ -57,4 +57,4 @@ module uart_tx #(
         end
     end
 
-endmodule
+endmodule 

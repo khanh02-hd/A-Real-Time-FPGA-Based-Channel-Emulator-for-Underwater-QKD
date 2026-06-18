@@ -317,3 +317,4 @@ When adding new features or modifications, ensure:
 - Use the lookup table `.mif` files as read-only for FPGA deployment
 - Real-time monitoring may require calibration with your specific hardware setup
 - Distance sweep range: 1.0 m to 7.0 m (0.1 m intervals)
+ 

@@ -21,4 +21,4 @@ set_false_path -from [get_ports {rst_n}]
 # For FPGA hardware mode, timing warnings related to raw_meta can be
 # safely ignored because raw_meta is the first synchronizer register
 # for ring oscillator entropy.
-# ============================================================
+# ============================================================ 
