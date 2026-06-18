@@ -112,4 +112,4 @@ export_mif("lut_ho_bank_65536.mif", bank_ho, BANK_DEPTH)
 export_mif("lut_hs_bank_65536.mif", bank_hs, BANK_DEPTH)
 
 print(f"\n=== COPY KHỐI SAU VÀO case (auto_sw) DÀNH CHO {env_name} ===")
-print(ls_verilog)
+print(ls_verilog) 

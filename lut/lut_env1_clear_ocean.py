@@ -137,4 +137,4 @@ skr_penalty_fixed = np.clip(
 ).astype(np.uint16)
 
 export_mif("lut_skr_penalty.mif", skr_penalty_fixed, 1024)
-print("[+] Đã tạo file lut_skr_penalty.mif (DEPTH = 1024)")
+print("[+] Đã tạo file lut_skr_penalty.mif (DEPTH = 1024)") 

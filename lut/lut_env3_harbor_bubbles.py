@@ -382,4 +382,4 @@ print("     lut_hs_bank_65536.mif")
 print(f"     summary_{env_name}.txt")
 
 print(f"\n=== COPY KHỐI SAU VÀO case (auto_sw) DÀNH CHO {env_name} ===")
-print(ls_verilog)
+print(ls_verilog) 

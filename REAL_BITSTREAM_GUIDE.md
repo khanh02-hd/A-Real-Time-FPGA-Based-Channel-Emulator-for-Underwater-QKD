@@ -299,3 +299,4 @@ with open('real_qkd_bitstream.bin', 'r') as f:
 
 **Note**: This implementation assumes standard FPGA environment (50 MHz clock, 115200 UART).
 Adjust timing parameters if using different clock frequency.
+ 

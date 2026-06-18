@@ -68,3 +68,4 @@ d=6.7m | L_eff=1.317e-09 | sigma_I2=3.216e-02 | ho_mean=1.000 | ho_std=0.678 | h
 d=6.8m | L_eff=1.026e-09 | sigma_I2=3.362e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
 d=6.9m | L_eff=8.003e-10 | sigma_I2=3.512e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
 d=7.0m | L_eff=6.244e-10 | sigma_I2=3.667e-02 | ho_mean=1.000 | ho_std=0.678 | hs_mean=1.000 | hs_std=0.223
+ 

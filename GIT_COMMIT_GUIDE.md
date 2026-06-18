@@ -124,3 +124,4 @@ git notes add -m "Implement live channel parameter tracking with adaptive thresh
 ```
 
 This provides clarity without polluting the main commit message.
+ 

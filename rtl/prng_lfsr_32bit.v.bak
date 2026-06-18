@@ -12,4 +12,4 @@ module prng_lfsr_32bit #(
         else
             lfsr_out <= {lfsr_out[30:0], lfsr_out[31] ^ lfsr_out[21] ^ lfsr_out[1] ^ lfsr_out[0]};
     end
-endmodule
+endmodule 

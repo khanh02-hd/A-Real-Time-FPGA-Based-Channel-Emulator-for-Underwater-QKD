@@ -106,3 +106,4 @@ This project follows semantic versioning once 1.0.0 is released.
 - Machine learning-based channel prediction
 - Adaptive key extraction based on channel conditions
 - Production-ready bitstream certification system
+ 
