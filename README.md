@@ -36,12 +36,14 @@ The project evaluates QKD performance across three distinct underwater scenarios
 │
 ├── rtl/                       # FPGA RTL (Verilog) and design files
 │   ├── top_qkd_receiver.v           # Top-level receiver module
+│   ├── qkd_sifted_key_extractor.v   # Extracts raw sifted keys for UART transmission
+│   ├── qkd_bitstream_buffer.v       # Buffer for quantum bitstream processing
 │   ├── uwoc_channel_st.v            # Underwater optical channel model
 │   ├── uwoc_qkd_soc.v               # QKD System-on-Chip
 │   ├── uart_tx.v                    # UART transmitter
 │   ├── qkd_metrics_counter.v        # QKD performance counter
 │   ├── skr_evaluator.v              # Secret key rate evaluator
-│   ├── trng_qkd3_source.v           # TRNG source
+│   ├── trng_qkd3_source.v           # TRNG source (including RO lanes and VN extractor)
 │   ├── rom_ho.v, rom_hs.v           # ROM instances for lookup tables
 │   ├── *.qpf, *.qsf                 # Quartus project files
 │   ├── *.sdc                        # Timing constraints
