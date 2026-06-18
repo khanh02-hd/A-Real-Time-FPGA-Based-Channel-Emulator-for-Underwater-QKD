@@ -1,30 +1,38 @@
 import serial
 import struct
-import time
 import glob
+from datetime import datetime
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-# ============================================================
-# 1. CẤU HÌNH UART
-# ============================================================
-SERIAL_PORT = "COM16"       # Đổi lại đúng cổng COM của DE2-115
-BAUD_RATE = 115200
-SERIAL_TIMEOUT = 1.0
 
 # ============================================================
-# 2. CẤU HÌNH AUTO-SWEEP 61 MỐC
+# 1. UART CONFIG
+# ============================================================
+
+SERIAL_PORT = "COM16"       # Đổi lại đúng cổng COM của DE2-115
+BAUD_RATE = 115200
+SERIAL_TIMEOUT = 2.0
+
+# Must match MAX_BYTES in qkd_sifted_key_extractor.v
+MAX_KEY_PAYLOAD_BYTES = 512
+
+
+# ============================================================
+# 2. AUTO-SWEEP CONFIG
+#
 # FPGA:
 #   auto_sw = 0  -> 1.0 m
 #   auto_sw = 1  -> 1.1 m
 #   ...
 #   auto_sw = 60 -> 7.0 m
 #
-# Verilog đang giữ mỗi mốc 5 packet.
-# Python bỏ packet đầu sau khi đổi mốc, lấy trung bình 4 packet còn lại.
+# Verilog đang giữ mỗi khoảng cách 5 frame.
+# Python bỏ frame đầu sau khi đổi mốc, lấy trung bình 4 frame còn lại.
 # ============================================================
+
 NUM_SWEEP_POINTS = 61
 SAMPLES_PER_DISTANCE = 4
 SKIP_FIRST_PACKET_AFTER_SWITCH = True
@@ -45,57 +53,153 @@ QBER_LIMIT = 0.11
 
 
 # ============================================================
-# 3. ĐỌC GÓI UART 16 BYTE TỪ FPGA
-#
-# Packet format:
-#
-# byte 0  : 0xAA
-# byte 1  : final_skr[31:24]
-# byte 2  : final_skr[23:16]
-# byte 3  : final_skr[15:8]
-# byte 4  : final_skr[7:0]
-# byte 5  : {SW[5:0], QBER[9:8]}
-# byte 6  : QBER[7:0]
-# byte 7  : n_sifted[31:24]
-# byte 8  : n_sifted[23:16]
-# byte 9  : n_sifted[15:8]
-# byte 10 : n_sifted[7:0]
-# byte 11 : n_error[31:24]
-# byte 12 : n_error[23:16]
-# byte 13 : n_error[15:8]
-# byte 14 : n_error[7:0]
-# byte 15 : 0x55
+# 3. BYTE HELPERS
 # ============================================================
-def read_one_packet(ser: serial.Serial):
-    b = ser.read(1)
 
-    if len(b) != 1 or b[0] != 0xAA:
-        return None
+def read_exact(ser: serial.Serial, n: int) -> bytes:
+    """
+    Read exactly n bytes from serial.
+    pyserial may return partial data, so keep reading until enough bytes arrive.
+    """
+    data = bytearray()
 
-    rest = ser.read(15)
+    while len(data) < n:
+        chunk = ser.read(n - len(data))
 
-    if len(rest) != 15:
-        return None
+        if not chunk:
+            raise TimeoutError(f"Timeout while reading {n} bytes")
 
-    if rest[14] != 0x55:
-        return None
+        data.extend(chunk)
 
-    final_skr = struct.unpack(">I", rest[0:4])[0]
+    return bytes(data)
 
-    # rest[4] = [SW5 SW4 SW3 SW2 SW1 SW0 QBER9 QBER8]
-    sw_state = (rest[4] >> 2) & 0x3F
 
-    qber_high = rest[4] & 0x03
-    qber_low = rest[5]
+def bytes_to_u32_be(b: bytes) -> int:
+    """
+    Convert 4 bytes big-endian to unsigned 32-bit integer.
+    """
+    return struct.unpack(">I", b)[0]
+
+
+# ============================================================
+# 4. NEW FRAME PARSER
+#
+# New FPGA frame format:
+#
+#   0xAA
+#   14 bytes metric:
+#       final_skr       : 4 bytes, big endian
+#       sw/qber         : 2 bytes
+#       n_sifted        : 4 bytes, big endian
+#       n_error         : 4 bytes, big endian
+#   0xBB
+#   key_payload_length  : 2 bytes, little endian, in bytes
+#   key_payload         : key_payload_length bytes
+#   0x55
+#
+# This plotting script uses only metric data.
+# It still reads/discards key payload to keep UART synchronization.
+# ============================================================
+
+def wait_for_frame_start(ser: serial.Serial) -> bool:
+    """
+    Wait until 0xAA is found.
+    """
+    while True:
+        b = ser.read(1)
+
+        if not b:
+            return False
+
+        if b[0] == 0xAA:
+            return True
+
+
+def parse_metric_payload(payload: bytes):
+    """
+    Parse 14-byte metric payload after 0xAA.
+    """
+    if len(payload) != 14:
+        raise ValueError("Metric payload must be exactly 14 bytes")
+
+    final_skr = bytes_to_u32_be(payload[0:4])
+
+    # payload[4] = [SW5 SW4 SW3 SW2 SW1 SW0 QBER9 QBER8]
+    sw_state = (payload[4] >> 2) & 0x3F
+
+    qber_high = payload[4] & 0x03
+    qber_low = payload[5]
     qber_idx = (qber_high << 8) | qber_low
 
-    n_sifted = struct.unpack(">I", rest[6:10])[0]
-    n_error = struct.unpack(">I", rest[10:14])[0]
+    n_sifted = bytes_to_u32_be(payload[6:10])
+    n_error = bytes_to_u32_be(payload[10:14])
 
     return final_skr, qber_idx, n_sifted, n_error, sw_state
 
 
+def read_one_frame(ser: serial.Serial):
+    """
+    Read one complete new-format FPGA frame.
+
+    Return:
+        final_skr, qber_idx, n_sifted, n_error, sw_state, key_byte_count
+
+    If frame is corrupted, return None and resync on next call.
+    """
+    try:
+        ok = wait_for_frame_start(ser)
+
+        if not ok:
+            return None
+
+        # 1. Metric payload
+        metric_payload = read_exact(ser, 14)
+        final_skr, qber_idx, n_sifted, n_error, sw_state = parse_metric_payload(metric_payload)
+
+        # 2. Key header
+        key_header = read_exact(ser, 1)[0]
+
+        if key_header != 0xBB:
+            print(f"[WARN] Expected key header 0xBB, got 0x{key_header:02X}. Resyncing...")
+            return None
+
+        # 3. Key payload length, little endian
+        length_bytes = read_exact(ser, 2)
+        key_byte_count = length_bytes[0] | (length_bytes[1] << 8)
+
+        # 4. Sanity check
+        if key_byte_count > MAX_KEY_PAYLOAD_BYTES:
+            print(
+                f"[WARN] Invalid key payload length: "
+                f"{key_byte_count} bytes > {MAX_KEY_PAYLOAD_BYTES}. Resyncing..."
+            )
+            return None
+
+        # 5. Read and discard key payload
+        _ = read_exact(ser, key_byte_count)
+
+        # 6. Footer
+        footer = read_exact(ser, 1)[0]
+
+        if footer != 0x55:
+            print(f"[WARN] Expected footer 0x55, got 0x{footer:02X}. Resyncing...")
+            return None
+
+        return final_skr, qber_idx, n_sifted, n_error, sw_state, key_byte_count
+
+    except TimeoutError as e:
+        print(f"[WARN] {e}. Resyncing...")
+        return None
+
+    except ValueError as e:
+        print(f"[WARN] {e}. Resyncing...")
+        return None
+
+
 def get_status(final_skr: int, n_sifted: int, n_error: int):
+    """
+    Return SAFE / ALERT / OUTAGE status.
+    """
     qber_pc = (n_error / n_sifted) if n_sifted > 0 else 0.0
 
     if n_sifted < MIN_SIFTED_SAFE:
@@ -107,8 +211,96 @@ def get_status(final_skr: int, n_sifted: int, n_error: int):
 
 
 # ============================================================
-# 4. VẼ ĐỒ THỊ GỘP TỪ CÁC FILE CSV
+# 5. SAVE ONE DISTANCE POINT
 # ============================================================
+
+def save_current_point(
+    env_name,
+    current_sw,
+    valid_samples,
+    sum_qber,
+    sum_skr,
+    sum_sifted,
+    sum_error,
+    sum_key_bytes,
+    qber_results,
+    skr_results,
+    sifted_results,
+    error_results,
+    key_bytes_results,
+    collected_distances,
+):
+    if current_sw < 0 or current_sw >= NUM_SWEEP_POINTS:
+        return
+
+    if valid_samples <= 0:
+        print(f"[!] Mốc {SCENARIO_MAP[current_sw]} không có mẫu hợp lệ, bỏ qua.")
+        return
+
+    avg_qber = (sum_qber / valid_samples) * 100.0
+    avg_skr = sum_skr / valid_samples
+    avg_sifted = sum_sifted / valid_samples
+    avg_error = sum_error / valid_samples
+    avg_key_bytes = sum_key_bytes / valid_samples
+
+    qber_results.append(avg_qber)
+    skr_results.append(avg_skr)
+    sifted_results.append(avg_sifted)
+    error_results.append(avg_error)
+    key_bytes_results.append(avg_key_bytes)
+    collected_distances.append(round(1.0 + current_sw * 0.1, 1))
+
+    sample_note = ""
+
+    if valid_samples != SAMPLES_PER_DISTANCE:
+        sample_note = f"  [cảnh báo: chỉ có {valid_samples}/{SAMPLES_PER_DISTANCE} mẫu]"
+
+    print(
+        f"[+] ĐÃ LƯU MỐC {SCENARIO_MAP[current_sw]}: "
+        f"QBER={avg_qber:.2f}%, "
+        f"SKR={avg_skr:.0f} bps, "
+        f"SIFTED={avg_sifted:.0f}, "
+        f"ERROR={avg_error:.0f}, "
+        f"KEY_PAYLOAD={avg_key_bytes:.1f} bytes"
+        f"{sample_note}"
+    )
+
+
+# ============================================================
+# 6. WAIT FOR SWEEP START
+# ============================================================
+
+def wait_for_sweep_start(ser: serial.Serial):
+    """
+    Wait until FPGA returns to sw_state = 0.
+    """
+    print("[*] Xóa buffer UART cũ...")
+    ser.reset_input_buffer()
+
+    print("[*] Đang chờ frame đầu tiên có sw_state = 0 tương ứng 1.0m...")
+
+    while True:
+        res = read_one_frame(ser)
+
+        if res is None:
+            continue
+
+        _, _, _, _, sw_state, _ = res
+
+        if sw_state == 0:
+            print("[+] Đã bắt được mốc 1.0m. Bắt đầu thu thập dữ liệu.\n")
+            return res
+
+        if 0 <= sw_state <= 60:
+            print(f"    Đang thấy FPGA ở mốc {SCENARIO_MAP[sw_state]}, chờ reset về 1.0m...")
+        else:
+            print(f"    Bỏ qua frame lỗi: sw_state={sw_state}")
+
+
+# ============================================================
+# 7. DRAW COMPARATIVE PLOTS FROM CSV
+# ============================================================
+
 def draw_comparative_plots():
     csv_files = sorted(glob.glob("*_qkd_data.csv"))
 
@@ -126,6 +318,7 @@ def draw_comparative_plots():
         df = pd.read_csv(filename)
 
         marker = markers[idx % len(markers)]
+        label = env_name.replace("_", " ")
 
         ax1.plot(
             df["Distance(m)"],
@@ -135,7 +328,7 @@ def draw_comparative_plots():
             linestyle="-",
             linewidth=2,
             markersize=6,
-            label=env_name.replace("_", " "),
+            label=label,
         )
 
         skr_plot = df["SKR(bps)"].replace(0, np.nan)
@@ -148,7 +341,7 @@ def draw_comparative_plots():
             linestyle="-",
             linewidth=2,
             markersize=6,
-            label=env_name.replace("_", " "),
+            label=label,
         )
 
     ax1.axhline(
@@ -176,96 +369,91 @@ def draw_comparative_plots():
     plt.show()
 
 
-# ============================================================
-# 5. CHỜ FPGA RESET VỀ MỐC 1.0m
-# ============================================================
-def wait_for_sweep_start(ser: serial.Serial):
-    print("[*] Xóa buffer UART cũ...")
-    ser.reset_input_buffer()
+def draw_single_environment_plot(csv_filename: str):
+    """
+    Draw plots for one environment after collecting data.
+    """
+    df = pd.read_csv(csv_filename)
 
-    print("[*] Đang chờ packet đầu tiên có sw_state = 0 tương ứng 1.0m...")
+    env_name = df["Environment"].iloc[0] if "Environment" in df.columns else csv_filename
 
-    while True:
-        res = read_one_packet(ser)
-
-        if res is None:
-            continue
-
-        _, _, _, _, sw_state = res
-
-        if sw_state == 0:
-            print("[+] Đã bắt được mốc 1.0m. Bắt đầu thu thập dữ liệu.\n")
-            return res
-
-        if sw_state <= 60:
-            print(f"    Đang thấy FPGA ở mốc {SCENARIO_MAP[sw_state]}, chờ reset về 1.0m...")
-        else:
-            print(f"    Bỏ qua packet lỗi: sw_state={sw_state}")
-
-
-# ============================================================
-# 6. LƯU MỘT MỐC ĐO VÀO MẢNG KẾT QUẢ
-# ============================================================
-def save_current_point(
-    env_name,
-    current_sw,
-    valid_samples,
-    sum_qber,
-    sum_skr,
-    sum_sifted,
-    sum_error,
-    qber_results,
-    skr_results,
-    sifted_results,
-    error_results,
-    collected_distances,
-):
-    if current_sw < 0 or current_sw >= NUM_SWEEP_POINTS:
-        return
-
-    if valid_samples <= 0:
-        print(f"[!] Mốc {SCENARIO_MAP[current_sw]} không có mẫu hợp lệ, bỏ qua.")
-        return
-
-    avg_qber = (sum_qber / valid_samples) * 100.0
-    avg_skr = sum_skr / valid_samples
-    avg_sifted = sum_sifted / valid_samples
-    avg_error = sum_error / valid_samples
-
-    qber_results.append(avg_qber)
-    skr_results.append(avg_skr)
-    sifted_results.append(avg_sifted)
-    error_results.append(avg_error)
-    collected_distances.append(round(1.0 + current_sw * 0.1, 1))
-
-    sample_note = ""
-    if valid_samples != SAMPLES_PER_DISTANCE:
-        sample_note = f"  [cảnh báo: chỉ có {valid_samples}/{SAMPLES_PER_DISTANCE} mẫu]"
-
-    print(
-        f"[+] ĐÃ LƯU MỐC {SCENARIO_MAP[current_sw]}: "
-        f"QBER={avg_qber:.2f}%, "
-        f"SKR={avg_skr:.0f} bps, "
-        f"SIFTED={avg_sifted:.0f}, "
-        f"ERROR={avg_error:.0f}"
-        f"{sample_note}"
+    plt.figure(figsize=(8, 5))
+    plt.plot(
+        df["Distance(m)"],
+        df["QBER(%)"],
+        marker="o",
+        linestyle="-",
+        linewidth=2,
+        markersize=5,
+        label=env_name.replace("_", " "),
     )
 
+    plt.axhline(
+        y=11.0,
+        color="black",
+        linestyle="--",
+        label="BB84 limit 11%",
+    )
+
+    plt.xlabel("Link Distance (m)", fontsize=12, fontweight="bold")
+    plt.ylabel("Quantum Bit Error Rate (%)", fontsize=12, fontweight="bold")
+    plt.title(f"QBER vs Distance - {env_name.replace('_', ' ')}", fontsize=14)
+    plt.grid(True, which="both", linestyle="--", alpha=0.6)
+    plt.legend()
+    plt.tight_layout()
+
+    qber_fig = f"{env_name}_QBER_vs_Distance.png"
+    plt.savefig(qber_fig, dpi=300, bbox_inches="tight")
+    print(f"[*] Đã lưu đồ thị: {qber_fig}")
+    plt.show()
+
+    plt.figure(figsize=(8, 5))
+
+    skr_plot = df["SKR(bps)"].replace(0, np.nan)
+
+    plt.semilogy(
+        df["Distance(m)"],
+        skr_plot,
+        marker="s",
+        linestyle="-",
+        linewidth=2,
+        markersize=5,
+        label=env_name.replace("_", " "),
+    )
+
+    plt.xlabel("Link Distance (m)", fontsize=12, fontweight="bold")
+    plt.ylabel("Secret Key Rate (bps)", fontsize=12, fontweight="bold")
+    plt.title(f"SKR vs Distance - {env_name.replace('_', ' ')}", fontsize=14)
+    plt.grid(True, which="both", linestyle="--", alpha=0.6)
+    plt.legend()
+    plt.tight_layout()
+
+    skr_fig = f"{env_name}_SKR_vs_Distance.png"
+    plt.savefig(skr_fig, dpi=300, bbox_inches="tight")
+    print(f"[*] Đã lưu đồ thị: {skr_fig}")
+    plt.show()
+
 
 # ============================================================
-# 7. CHƯƠNG TRÌNH ĐO ĐẠC CHÍNH
+# 8. MAIN DATA ACQUISITION
 # ============================================================
+
 def main():
-    print("=== CÔNG CỤ THU THẬP DỮ LIỆU TỰ ĐỘNG UWOC-QKD ===")
-    print("Môi trường khả dụng:", ", ".join(VALID_ENV_NAMES))
-    print("Auto-sweep: 1.0m -> 7.0m, bước 0.1m, tổng 61 mốc.")
+    print("=== UART DAQ PLOTTER FOR UWOC-QKD FPGA ===")
+    print("Frame format: 0xAA + metric + 0xBB + key payload + 0x55")
+    print("Auto-sweep: 1.0m -> 7.0m, step 0.1m, total 61 points.")
+    print("Available environments:", ", ".join(VALID_ENV_NAMES))
     print()
+
+    port_input = input(f"Nhập cổng COM [{SERIAL_PORT}]: ").strip()
+    serial_port = port_input if port_input else SERIAL_PORT
 
     env_name = input("Nhập tên môi trường đang đo: ").strip()
 
     if env_name not in VALID_ENV_NAMES:
         print(f"[!] Cảnh báo: '{env_name}' không nằm trong danh sách chuẩn.")
         print("    Nên dùng: Clear_Water, Coastal_Water, Turbid_Harbor")
+
         confirm = input("Vẫn tiếp tục? (y/n): ").strip().lower()
 
         if confirm != "y":
@@ -276,22 +464,26 @@ def main():
     skr_results = []
     sifted_results = []
     error_results = []
+    key_bytes_results = []
     collected_distances = []
 
     ser = None
 
     try:
         ser = serial.Serial(
-            port=SERIAL_PORT,
+            port=serial_port,
             baudrate=BAUD_RATE,
             timeout=SERIAL_TIMEOUT,
+            bytesize=serial.EIGHTBITS,
+            parity=serial.PARITY_NONE,
+            stopbits=serial.STOPBITS_ONE,
         )
 
-        print(f"\n[*] Kết nối {SERIAL_PORT} @ {BAUD_RATE} bps thành công.")
-        print("[*] Hãy bấm RESET KEY0 trên DE2-115 để FPGA chạy lại từ 1.0m.")
+        print(f"\n[*] Kết nối {serial_port} @ {BAUD_RATE} bps thành công.")
+        print("[*] Hãy bấm RESET trên DE2-115 để FPGA chạy lại từ 1.0m.")
         input("[*] Sau khi bấm RESET, nhấn Enter để bắt đầu chờ dữ liệu...")
 
-        pending_packet = wait_for_sweep_start(ser)
+        pending_frame = wait_for_sweep_start(ser)
 
         current_sw = -1
 
@@ -299,43 +491,46 @@ def main():
         sum_skr = 0.0
         sum_sifted = 0.0
         sum_error = 0.0
+        sum_key_bytes = 0.0
 
         valid_samples = 0
         is_first_packet = True
 
         while True:
-            if pending_packet is not None:
-                res = pending_packet
-                pending_packet = None
+            if pending_frame is not None:
+                res = pending_frame
+                pending_frame = None
             else:
-                res = read_one_packet(ser)
+                res = read_one_frame(ser)
 
             if res is None:
                 continue
 
-            final_skr, qber_idx, n_sifted, n_error, sw_state = res
+            final_skr, qber_idx, n_sifted, n_error, sw_state, key_byte_count = res
 
             if sw_state >= NUM_SWEEP_POINTS:
-                print(f"[!] Bỏ qua packet lỗi: sw_state={sw_state}")
+                print(f"[!] Bỏ qua frame lỗi: sw_state={sw_state}")
                 continue
 
             # ----------------------------------------------------
-            # FPGA chuyển sang mốc mới
+            # FPGA switched to new distance
             # ----------------------------------------------------
             if sw_state != current_sw:
                 save_current_point(
-                    env_name,
-                    current_sw,
-                    valid_samples,
-                    sum_qber,
-                    sum_skr,
-                    sum_sifted,
-                    sum_error,
-                    qber_results,
-                    skr_results,
-                    sifted_results,
-                    error_results,
-                    collected_distances,
+                    env_name=env_name,
+                    current_sw=current_sw,
+                    valid_samples=valid_samples,
+                    sum_qber=sum_qber,
+                    sum_skr=sum_skr,
+                    sum_sifted=sum_sifted,
+                    sum_error=sum_error,
+                    sum_key_bytes=sum_key_bytes,
+                    qber_results=qber_results,
+                    skr_results=skr_results,
+                    sifted_results=sifted_results,
+                    error_results=error_results,
+                    key_bytes_results=key_bytes_results,
+                    collected_distances=collected_distances,
                 )
 
                 current_sw = sw_state
@@ -344,6 +539,7 @@ def main():
                 sum_skr = 0.0
                 sum_sifted = 0.0
                 sum_error = 0.0
+                sum_key_bytes = 0.0
 
                 valid_samples = 0
                 is_first_packet = True
@@ -351,17 +547,17 @@ def main():
                 print(f"\n🔄 Đang thu thập dữ liệu tại: {SCENARIO_MAP[current_sw]}")
 
             # ----------------------------------------------------
-            # Bỏ packet đầu mỗi mốc để tránh dữ liệu chuyển trạng thái
+            # Skip first frame after distance switch
             # ----------------------------------------------------
             if SKIP_FIRST_PACKET_AFTER_SWITCH and is_first_packet:
                 is_first_packet = False
-                print("   [~] Bỏ qua packet đầu của mốc này.")
+                print("   [~] Bỏ qua frame đầu của mốc này để tránh dữ liệu chuyển trạng thái.")
                 continue
 
             is_first_packet = False
 
             # ----------------------------------------------------
-            # Cộng dồn packet hợp lệ
+            # Accumulate valid frame
             # ----------------------------------------------------
             qber_pc_val = (n_error / n_sifted) if n_sifted > 0 else 0.0
             qber_pc_pct = qber_pc_val * 100.0
@@ -371,6 +567,7 @@ def main():
             sum_skr += final_skr
             sum_sifted += n_sifted
             sum_error += n_error
+            sum_key_bytes += key_byte_count
 
             valid_samples += 1
 
@@ -383,33 +580,36 @@ def main():
                 f"QBER_FPGA={qber_fpga_pct:>6.2f}% | "
                 f"QBER_PC={qber_pc_pct:>6.2f}% | "
                 f"SKR={final_skr:<10d} | "
+                f"KEY_BYTES={key_byte_count:<4d} | "
                 f"STATUS={status}"
             )
 
             # ----------------------------------------------------
-            # Điểm dừng: đã ở 7.0m và lấy đủ 4 mẫu
+            # Stop condition: 7.0m and enough samples
             # ----------------------------------------------------
             if current_sw == 60 and valid_samples >= SAMPLES_PER_DISTANCE:
                 save_current_point(
-                    env_name,
-                    current_sw,
-                    valid_samples,
-                    sum_qber,
-                    sum_skr,
-                    sum_sifted,
-                    sum_error,
-                    qber_results,
-                    skr_results,
-                    sifted_results,
-                    error_results,
-                    collected_distances,
+                    env_name=env_name,
+                    current_sw=current_sw,
+                    valid_samples=valid_samples,
+                    sum_qber=sum_qber,
+                    sum_skr=sum_skr,
+                    sum_sifted=sum_sifted,
+                    sum_error=sum_error,
+                    sum_key_bytes=sum_key_bytes,
+                    qber_results=qber_results,
+                    skr_results=skr_results,
+                    sifted_results=sifted_results,
+                    error_results=error_results,
+                    key_bytes_results=key_bytes_results,
+                    collected_distances=collected_distances,
                 )
 
                 print("\n✅ FPGA đã quét xong 61 mốc từ 1.0m đến 7.0m.")
                 break
 
         # --------------------------------------------------------
-        # Lưu CSV
+        # Save CSV
         # --------------------------------------------------------
         df = pd.DataFrame(
             {
@@ -419,6 +619,7 @@ def main():
                 "SKR(bps)": skr_results,
                 "Avg_Sifted": sifted_results,
                 "Avg_Error": error_results,
+                "Avg_Key_Payload_Bytes": key_bytes_results,
             }
         )
 
@@ -428,6 +629,7 @@ def main():
         print(f"\n[*] Đã lưu toàn bộ dữ liệu vào file: {csv_filename}")
         print(f"[*] Số mốc đã lưu: {len(collected_distances)}/61")
 
+        draw_single_environment_plot(csv_filename)
         draw_comparative_plots()
 
     except serial.SerialException as e:
@@ -445,11 +647,14 @@ def main():
                     "SKR(bps)": skr_results,
                     "Avg_Sifted": sifted_results,
                     "Avg_Error": error_results,
+                    "Avg_Key_Payload_Bytes": key_bytes_results,
                 }
             )
 
-            csv_filename = f"{env_name}_partial_qkd_data.csv"
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            csv_filename = f"{env_name}_partial_qkd_data_{timestamp}.csv"
             df.to_csv(csv_filename, index=False)
+
             print(f"[*] Đã lưu dữ liệu đo dở vào file: {csv_filename}")
 
     except Exception as e:
@@ -458,6 +663,7 @@ def main():
     finally:
         if ser is not None and ser.is_open:
             ser.close()
+            print("[*] Đã đóng cổng UART.")
 
 
 if __name__ == "__main__":

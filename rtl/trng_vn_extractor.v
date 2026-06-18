@@ -2,11 +2,19 @@
 
 // =============================================================
 // Von Neumann extractor
+//
 // 00 -> discard
 // 11 -> discard
 // 01 -> output 0
 // 10 -> output 1
+//
+// NOTE:
+// - This module is logically correct.
+// - In this UWOC-QKD project, it should NOT be used for sifted key.
+// - It is also not recommended for the high-throughput TRNG path
+//   because it may cause random-bit starvation.
 // =============================================================
+
 module trng_vn_extractor (
     input  wire clk,
     input  wire rst_n,
@@ -49,7 +57,7 @@ module trng_vn_extractor (
                         end
 
                         default: begin
-                            out_valid <= 1'b0; // 00 hoặc 11: bỏ
+                            out_valid <= 1'b0;
                             out_bit   <= 1'b0;
                         end
                     endcase

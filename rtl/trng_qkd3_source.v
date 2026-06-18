@@ -14,7 +14,7 @@
 // Simulation mode:
 //   Uses xorshift LFSR for fast simulation.
 //
-// This version removes the 128-bit dynamic buffer to improve timing.
+// This version fixes buffered_bits latch inference in SIM_MODE.
 // =============================================================
 
 module trng_qkd3_source #(
@@ -68,8 +68,9 @@ module trng_qkd3_source #(
                     random_bits   <= 3'b000;
                     buffered_bits <= 8'd255;
                 end else begin
-                    random_valid <= 1'b0;
-                    sim_lfsr     <= xs32_next(sim_lfsr);
+                    random_valid  <= 1'b0;
+                    buffered_bits <= 8'd255;
+                    sim_lfsr      <= xs32_next(sim_lfsr);
 
                     if (request_3bits) begin
                         random_bits  <= sim_lfsr[2:0];
@@ -90,23 +91,21 @@ module trng_qkd3_source #(
             genvar i;
             for (i = 0; i < LANE_COUNT; i = i + 1) begin : GEN_LANE
                 trng_ro_lane #(
-                    .RO_BANKS (RO_BANKS),
-                    .RO_STAGES(RO_STAGES)
+                    .RO_BANKS  (RO_BANKS),
+                    .RO_STAGES (RO_STAGES)
                 ) u_lane (
-                    .clk      (clk),
-                    .rst_n    (rst_n),
-                    .bit_valid(lane_valid[i]),
-                    .bit_out  (lane_bit[i])
+                    .clk       (clk),
+                    .rst_n     (rst_n),
+                    .bit_valid (lane_valid[i]),
+                    .bit_out   (lane_bit[i])
                 );
             end
 
-            // Các lane dùng cùng sample clock nên thường valid cùng lúc.
             wire all_lane_valid;
             assign all_lane_valid = &lane_valid;
 
             assign ready_3bits = all_lane_valid;
 
-            // Whitening state để giảm bias/tương quan ngắn hạn.
             reg [31:0] whiten_state;
 
             always @(posedge clk or negedge rst_n) begin
@@ -118,19 +117,12 @@ module trng_qkd3_source #(
                 end else begin
                     random_valid <= 1'b0;
 
-                    // buffered_bits chỉ dùng debug:
-                    // 16 nghĩa là đang có 16 bit vật lý sẵn sàng.
                     if (all_lane_valid)
                         buffered_bits <= 8'd16;
                     else
                         buffered_bits <= 8'd0;
 
                     if (request_3bits && all_lane_valid) begin
-
-                        // =================================================
-                        // Whitening:
-                        // 16 bit TRNG vật lý + whiten_state -> 3 BB84 bits
-                        // =================================================
 
                         random_bits[0] <= lane_bit[0]  ^
                                           lane_bit[3]  ^
@@ -161,7 +153,6 @@ module trng_qkd3_source #(
 
                         random_valid <= 1'b1;
 
-                        // Cập nhật whitening state bằng 16 bit TRNG mới.
                         whiten_state <= (whiten_state ^ {16'd0, lane_bit[15:0]})
                                         ^ {whiten_state[24:0], 7'd0}
                                         ^ {3'd0, whiten_state[31:3]};
