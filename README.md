@@ -27,6 +27,7 @@ The project evaluates QKD performance across three distinct underwater scenarios
 │   └── lut_skr_penalty.mif           # Secret key rate penalty LUT
 │
 ├── monitoring/                # Real-time UART data acquisition and visualization
+│   ├── fpga_key_and_metric_reader.py # Extract real quantum keys and metrics
 │   ├── uart_daq_plotter.py          # UART DAQ with real-time plotting
 │   └── uart_live_monitor.py         # Live monitoring interface
 │
